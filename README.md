@@ -1,4 +1,6 @@
-# Differentiable Neural Computer (DNC)
+# Updated to Tensorflow 2+
+# Differentiable Neural Computer (DNC) 
+
 
 This package provides an implementation of the Differentiable Neural Computer,
 as [published in Nature](

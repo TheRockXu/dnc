@@ -26,6 +26,7 @@ import collections
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+from sonnet.src import types
 
 from dnc import access
 
@@ -38,6 +39,9 @@ class DNC(snt.RNNCore):
 
   Contains controller and memory access module.
   """
+
+  def __call__(self, inputs: types.TensorNest, prev_state):
+      return self._build(inputs, prev_state)
 
   def __init__(self,
                access_config,
@@ -61,9 +65,9 @@ class DNC(snt.RNNCore):
     """
     super(DNC, self).__init__(name=name)
 
-    with self._enter_variable_scope():
-      self._controller = snt.LSTM(**controller_config)
-      self._access = access.MemoryAccess(**access_config)
+    # with self._enter_variable_scope():
+    self._controller = snt.LSTM(**controller_config)
+    self._access = access.MemoryAccess(**access_config)
 
     self._access_output_size = np.prod(self._access.output_size.as_list())
     self._output_size = output_size
@@ -73,7 +77,7 @@ class DNC(snt.RNNCore):
     self._state_size = DNCState(
         access_output=self._access_output_size,
         access_state=self._access.state_size,
-        controller_state=self._controller.state_size)
+        controller_state=self._controller._hidden_size)
 
   def _clip_if_enabled(self, x):
     if self._clip_value > 0:
@@ -102,7 +106,7 @@ class DNC(snt.RNNCore):
     prev_access_state = prev_state.access_state
     prev_controller_state = prev_state.controller_state
 
-    batch_flatten = snt.BatchFlatten()
+    batch_flatten = snt.Flatten()
     controller_input = tf.concat(
         [batch_flatten(inputs), batch_flatten(prev_access_output)], 1)
 
@@ -110,7 +114,7 @@ class DNC(snt.RNNCore):
         controller_input, prev_controller_state)
 
     controller_output = self._clip_if_enabled(controller_output)
-    controller_state = tf.contrib.framework.nest.map_structure(self._clip_if_enabled, controller_state)
+    controller_state = tf.nest.map_structure(self._clip_if_enabled, controller_state)
 
     access_output, access_state = self._access(controller_output,
                                                prev_access_state)

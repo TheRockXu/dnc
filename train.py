@@ -19,50 +19,50 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-import sonnet as snt
+# import sonnet as snt
 
 from dnc import dnc
 from dnc import repeat_copy
 
-FLAGS = tf.flags.FLAGS
+FLAGS = tf.compat.v1.flags.FLAGS
 
 # Model parameters
-tf.flags.DEFINE_integer("hidden_size", 64, "Size of LSTM hidden layer.")
-tf.flags.DEFINE_integer("memory_size", 16, "The number of memory slots.")
-tf.flags.DEFINE_integer("word_size", 16, "The width of each memory slot.")
-tf.flags.DEFINE_integer("num_write_heads", 1, "Number of memory write heads.")
-tf.flags.DEFINE_integer("num_read_heads", 4, "Number of memory read heads.")
-tf.flags.DEFINE_integer("clip_value", 20,
+tf.compat.v1.flags.DEFINE_integer("hidden_size", 64, "Size of LSTM hidden layer.")
+tf.compat.v1.flags.DEFINE_integer("memory_size", 16, "The number of memory slots.")
+tf.compat.v1.flags.DEFINE_integer("word_size", 16, "The width of each memory slot.")
+tf.compat.v1.flags.DEFINE_integer("num_write_heads", 1, "Number of memory write heads.")
+tf.compat.v1.flags.DEFINE_integer("num_read_heads", 4, "Number of memory read heads.")
+tf.compat.v1.flags.DEFINE_integer("clip_value", 20,
                         "Maximum absolute value of controller and dnc outputs.")
 
 # Optimizer parameters.
-tf.flags.DEFINE_float("max_grad_norm", 50, "Gradient clipping norm limit.")
-tf.flags.DEFINE_float("learning_rate", 1e-4, "Optimizer learning rate.")
-tf.flags.DEFINE_float("optimizer_epsilon", 1e-10,
+tf.compat.v1.flags.DEFINE_float("max_grad_norm", 50, "Gradient clipping norm limit.")
+tf.compat.v1.flags.DEFINE_float("learning_rate", 1e-4, "Optimizer learning rate.")
+tf.compat.v1.flags.DEFINE_float("optimizer_epsilon", 1e-10,
                       "Epsilon used for RMSProp optimizer.")
 
 # Task parameters
-tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
-tf.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
-tf.flags.DEFINE_integer(
+tf.compat.v1.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
+tf.compat.v1.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
+tf.compat.v1.flags.DEFINE_integer(
     "min_length", 1,
     "Lower limit on number of vectors in the observation pattern to copy")
-tf.flags.DEFINE_integer(
+tf.compat.v1.flags.DEFINE_integer(
     "max_length", 2,
     "Upper limit on number of vectors in the observation pattern to copy")
-tf.flags.DEFINE_integer("min_repeats", 1,
+tf.compat.v1.flags.DEFINE_integer("min_repeats", 1,
                         "Lower limit on number of copy repeats.")
-tf.flags.DEFINE_integer("max_repeats", 2,
+tf.compat.v1.flags.DEFINE_integer("max_repeats", 2,
                         "Upper limit on number of copy repeats.")
 
 # Training options.
-tf.flags.DEFINE_integer("num_training_iterations", 100000,
+tf.compat.v1.flags.DEFINE_integer("num_training_iterations", 100000,
                         "Number of iterations to train for.")
-tf.flags.DEFINE_integer("report_interval", 100,
+tf.compat.v1.flags.DEFINE_integer("report_interval", 100,
                         "Iterations between reports (samples, valid loss).")
-tf.flags.DEFINE_string("checkpoint_dir", "/tmp/tf/dnc",
+tf.compat.v1.flags.DEFINE_string("checkpoint_dir", "/tmp/tf/dnc",
                        "Checkpointing directory.")
-tf.flags.DEFINE_integer("checkpoint_interval", -1,
+tf.compat.v1.flags.DEFINE_integer("checkpoint_interval", -1,
                         "Checkpointing step interval.")
 
 
@@ -82,7 +82,7 @@ def run_model(input_sequence, output_size):
 
   dnc_core = dnc.DNC(access_config, controller_config, output_size, clip_value)
   initial_state = dnc_core.initial_state(FLAGS.batch_size)
-  output_sequence, _ = tf.nn.dynamic_rnn(
+  output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
       cell=dnc_core,
       inputs=input_sequence,
       time_major=True,
@@ -108,28 +108,28 @@ def train(num_training_iterations, report_interval):
                             dataset_tensors.mask)
 
   # Set up optimizer with global norm clipping.
-  trainable_variables = tf.trainable_variables()
+  trainable_variables = tf.compat.v1.trainable_variables()
   grads, _ = tf.clip_by_global_norm(
-      tf.gradients(train_loss, trainable_variables), FLAGS.max_grad_norm)
+      tf.gradients(ys=train_loss, xs=trainable_variables), FLAGS.max_grad_norm)
 
-  global_step = tf.get_variable(
+  global_step = tf.compat.v1.get_variable(
       name="global_step",
       shape=[],
       dtype=tf.int64,
-      initializer=tf.zeros_initializer(),
+      initializer=tf.compat.v1.zeros_initializer(),
       trainable=False,
-      collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
+      collections=[tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, tf.compat.v1.GraphKeys.GLOBAL_STEP])
 
-  optimizer = tf.train.RMSPropOptimizer(
+  optimizer = tf.compat.v1.train.RMSPropOptimizer(
       FLAGS.learning_rate, epsilon=FLAGS.optimizer_epsilon)
   train_step = optimizer.apply_gradients(
       zip(grads, trainable_variables), global_step=global_step)
 
-  saver = tf.train.Saver()
+  saver = tf.compat.v1.train.Saver()
 
   if FLAGS.checkpoint_interval > 0:
     hooks = [
-        tf.train.CheckpointSaverHook(
+        tf.estimator.CheckpointSaverHook(
             checkpoint_dir=FLAGS.checkpoint_dir,
             save_steps=FLAGS.checkpoint_interval,
             saver=saver)
@@ -138,7 +138,7 @@ def train(num_training_iterations, report_interval):
     hooks = []
 
   # Train.
-  with tf.train.SingularMonitoredSession(
+  with tf.compat.v1.train.SingularMonitoredSession(
       hooks=hooks, checkpoint_dir=FLAGS.checkpoint_dir) as sess:
 
     start_iteration = sess.run(global_step)
@@ -152,16 +152,16 @@ def train(num_training_iterations, report_interval):
         dataset_tensors_np, output_np = sess.run([dataset_tensors, output])
         dataset_string = dataset.to_human_readable(dataset_tensors_np,
                                                    output_np)
-        tf.logging.info("%d: Avg training loss %f.\n%s",
+        tf.compat.v1.logging.info("%d: Avg training loss %f.\n%s",
                         train_iteration, total_loss / report_interval,
                         dataset_string)
         total_loss = 0
 
 
 def main(unused_argv):
-  tf.logging.set_verbosity(3)  # Print INFO log messages.
+  tf.compat.v1.logging.set_verbosity(3)  # Print INFO log messages.
   train(FLAGS.num_training_iterations, FLAGS.report_interval)
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()
